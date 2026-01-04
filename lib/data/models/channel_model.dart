@@ -7,6 +7,7 @@ class ChannelModel extends Channel {
     required super.logo,
     required super.country,
     required super.category,
+    required super.languages,
   });
 
   factory ChannelModel.fromJson(Map<String, dynamic> json) {
@@ -16,6 +17,11 @@ class ChannelModel extends Channel {
       logo: json['logo'] ?? '',
       country: json['country'] ?? '',
       category: json['category'] ?? '',
+      // Mapeo seguro de la lista de idiomas
+      languages: (json['languages'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList() ??
+          [],
     );
   }
 }
