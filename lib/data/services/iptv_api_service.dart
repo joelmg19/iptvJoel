@@ -7,59 +7,76 @@ import '../models/stream_model.dart';
 
 class IptvApiService {
   final http.Client client;
-
-  // Cache para guardar los streams y no descargarlos cada vez
   List<StreamModel>? _cachedStreams;
 
   IptvApiService({http.Client? client}) : client = client ?? http.Client();
 
   /// Obtiene streams, usando caché y filtrando por ID de canal
   Future<List<StreamModel>> fetchStreamsByChannel(String channelId) async {
-    // 1. Si no tenemos los streams en memoria, los descargamos (solo la primera vez)
     if (_cachedStreams == null) {
-      print('Descargando lista maestra de streams... esto puede tardar un poco.');
-      final response = await client.get(
-        Uri.parse(ApiConstants.streams),
-      );
+      print('Descargando lista maestra de streams...');
+      final response = await client.get(Uri.parse(ApiConstants.streams));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-
-        // Guardamos todos los streams en memoria
-        _cachedStreams = data
-            .map((json) => StreamModel.fromJson(json))
-            .toList();
-        print('Total de streams descargados: ${_cachedStreams!.length}');
+        _cachedStreams = data.map((json) => StreamModel.fromJson(json)).toList();
       } else {
         throw Exception('Error al cargar streams IPTV');
       }
     }
 
-    // 2. Filtramos la lista maestra buscando coincidencias con el channelId
-    // y asegurando que sean enlaces .m3u8 (HLS)
     final matchingStreams = _cachedStreams!.where((stream) {
       final isValidUrl = stream.url.startsWith('http') && stream.url.contains('.m3u8');
       return stream.channelId == channelId && isValidUrl;
     }).toList();
 
-    print('Streams encontrados para el canal $channelId: ${matchingStreams.length}');
     return matchingStreams;
   }
 
   /// Obtiene la lista de canales
   Future<List<ChannelModel>> fetchChannels() async {
-    final response = await client.get(
-      Uri.parse(ApiConstants.channels),
-    );
-
+    final response = await client.get(Uri.parse(ApiConstants.channels));
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
-
-      return data
-          .map((json) => ChannelModel.fromJson(json))
-          .toList();
+      return data.map((json) => ChannelModel.fromJson(json)).toList();
     } else {
       throw Exception('Error al cargar canales IPTV');
     }
+  }
+
+  /// Obtiene mapa de códigos de país a nombres reales (ej: "CL" -> "Chile")
+  Future<Map<String, String>> fetchCountryNames() async {
+    try {
+      final response = await client.get(Uri.parse(ApiConstants.countries));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        final Map<String, String> map = {};
+        for (var item in data) {
+          map[item['code'].toString().toUpperCase()] = item['name'].toString();
+        }
+        return map;
+      }
+    } catch (e) {
+      print('Error cargando países: $e');
+    }
+    return {};
+  }
+
+  /// Obtiene mapa de códigos de idioma a nombres reales (ej: "spa" -> "Spanish")
+  Future<Map<String, String>> fetchLanguageNames() async {
+    try {
+      final response = await client.get(Uri.parse(ApiConstants.languages));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        final Map<String, String> map = {};
+        for (var item in data) {
+          map[item['code'].toString().toLowerCase()] = item['name'].toString();
+        }
+        return map;
+      }
+    } catch (e) {
+      print('Error cargando idiomas: $e');
+    }
+    return {};
   }
 }
